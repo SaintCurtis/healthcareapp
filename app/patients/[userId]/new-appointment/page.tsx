@@ -4,7 +4,34 @@ import { AppointmentForm } from "@/components/forms/AppointmentForm";
 import { getPatient } from "@/lib/actions/patient.actions";
 
 const Appointment = async ({ params: { userId } }: SearchParamProps) => {
-  const patient = await getPatient(userId);
+  let patient;
+  try {
+    patient = await getPatient(userId);
+    if (!patient?.$id) {
+      throw new Error("Patient not found");
+    }
+  } catch (error) {
+    console.error("Error fetching patient:", error);
+    return (
+      <div className="flex h-screen max-h-screen">
+        <section className="remove-scrollbar container my-auto">
+          <div className="sub-container max-w-[860px] flex-1 justify-between">
+            <Image
+              src="/assets/icons/logo-full.svg"
+              height={1000}
+              width={1000}
+              alt="logo"
+              className="mb-12 h-10 w-fit"
+            />
+            <p className="text-red-500">
+              Error: Unable to load patient data. Please try again.
+            </p>
+            <p className="copyright mt-10 py-12">© 2025 CarePulse</p>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen max-h-screen">
@@ -19,12 +46,12 @@ const Appointment = async ({ params: { userId } }: SearchParamProps) => {
           />
 
           <AppointmentForm
-            patientId={patient?.$id}
+            patientId={patient.$id}
             userId={userId}
             type="create"
           />
 
-          <p className="copyright mt-10 py-12">© 2024 CarePluse</p>
+          <p className="copyright mt-10 py-12">© 2025 CarePulse</p>
         </div>
       </section>
 

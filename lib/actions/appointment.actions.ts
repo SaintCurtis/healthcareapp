@@ -13,7 +13,7 @@ import {
 } from "../appwrite.config";
 import { formatDateTime, parseStringify } from "../utils";
 
-//  CREATE APPOINTMENT
+// CREATE APPOINTMENT
 export const createAppointment = async (
   appointment: CreateAppointmentParams
 ) => {
@@ -29,10 +29,11 @@ export const createAppointment = async (
     return parseStringify(newAppointment);
   } catch (error) {
     console.error("An error occurred while creating a new appointment:", error);
+    throw error;
   }
 };
 
-//  GET RECENT APPOINTMENTS
+// GET RECENT APPOINTMENTS
 export const getRecentAppointmentList = async () => {
   try {
     const appointments = await databases.listDocuments(
@@ -97,13 +98,13 @@ export const getRecentAppointmentList = async () => {
       "An error occurred while retrieving the recent appointments:",
       error
     );
+    throw error;
   }
 };
 
-//  SEND SMS NOTIFICATION
+// SEND SMS NOTIFICATION
 export const sendSMSNotification = async (userId: string, content: string) => {
   try {
-    // https://appwrite.io/docs/references/1.5.x/server-nodejs/messaging#createSms
     const message = await messaging.createSms(
       ID.unique(),
       content,
@@ -113,10 +114,11 @@ export const sendSMSNotification = async (userId: string, content: string) => {
     return parseStringify(message);
   } catch (error) {
     console.error("An error occurred while sending sms:", error);
+    throw error;
   }
 };
 
-//  UPDATE APPOINTMENT
+// UPDATE APPOINTMENT
 export const updateAppointment = async ({
   appointmentId,
   userId,
@@ -125,7 +127,20 @@ export const updateAppointment = async ({
   type,
 }: UpdateAppointmentParams) => {
   try {
-    // Update appointment to scheduled -> https://appwrite.io/docs/references/cloud/server-nodejs/databases#updateDocument
+    // Validate appointmentId
+    if (!appointmentId) {
+      throw new Error("Missing required parameter: appointmentId");
+    }
+
+    // Debug: Log input parameters
+    console.log("Updating appointment with ID:", appointmentId, "Data:", {
+      userId,
+      timeZone,
+      appointment,
+      type,
+    });
+
+    // Update appointment
     const updatedAppointment = await databases.updateDocument(
       DATABASE_ID!,
       APPOINTMENT_COLLECTION_ID!,
@@ -133,21 +148,35 @@ export const updateAppointment = async ({
       appointment
     );
 
-    if (!updatedAppointment) throw Error;
+    if (!updatedAppointment) throw new Error("Failed to update appointment");
 
-    const smsMessage = `Greetings from CarePulse. ${type === "schedule" ? `Your appointment is confirmed for ${formatDateTime(appointment.schedule!, timeZone).dateTime} with Dr. ${appointment.primaryPhysician}` : `We regret to inform that your appointment for ${formatDateTime(appointment.schedule!, timeZone).dateTime} is cancelled. Reason:  ${appointment.cancellationReason}`}.`;
+    const smsMessage = `Greetings from CarePulse. ${
+      type === "schedule"
+        ? `Your appointment is confirmed for ${
+            formatDateTime(appointment.schedule!, timeZone).dateTime
+          } with Dr. ${appointment.primaryPhysician}`
+        : `We regret to inform that your appointment for ${
+            formatDateTime(appointment.schedule!, timeZone).dateTime
+          } is cancelled. Reason: ${appointment.cancellationReason}`
+    }`;
     await sendSMSNotification(userId, smsMessage);
 
     revalidatePath("/admin");
     return parseStringify(updatedAppointment);
   } catch (error) {
     console.error("An error occurred while scheduling an appointment:", error);
+    throw error;
   }
 };
 
 // GET APPOINTMENT
 export const getAppointment = async (appointmentId: string) => {
   try {
+    // Validate appointmentId
+    if (!appointmentId) {
+      throw new Error("Missing required parameter: appointmentId");
+    }
+
     const appointment = await databases.getDocument(
       DATABASE_ID!,
       APPOINTMENT_COLLECTION_ID!,
@@ -156,9 +185,7 @@ export const getAppointment = async (appointmentId: string) => {
 
     return parseStringify(appointment);
   } catch (error) {
-    console.error(
-      "An error occurred while retrieving the existing patient:",
-      error
-    );
+    console.error("An error occurred while retrieving the appointment:", error);
+    throw error;
   }
 };

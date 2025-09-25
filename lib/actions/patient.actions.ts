@@ -1,6 +1,6 @@
 "use server";
 
-import { ID, InputFile, Query } from "node-appwrite";
+import { ID, InputFile, Query, Client, Account } from "node-appwrite";
 
 import {
   BUCKET_ID,
@@ -17,7 +17,6 @@ import { parseStringify } from "../utils";
 // CREATE APPWRITE USER
 export const createUser = async (user: CreateUserParams) => {
   try {
-    // Create new user -> https://appwrite.io/docs/references/1.5.x/server-nodejs/users#create
     const newuser = await users.create(
       ID.unique(),
       user.email,
@@ -28,7 +27,6 @@ export const createUser = async (user: CreateUserParams) => {
 
     return parseStringify(newuser);
   } catch (error: any) {
-    // Check existing user
     if (error && error?.code === 409) {
       const existingUser = await users.list([
         Query.equal("email", [user.email]),
@@ -60,7 +58,7 @@ export const registerPatient = async ({
   ...patient
 }: RegisterUserParams) => {
   try {
-    // Upload file ->  // https://appwrite.io/docs/references/cloud/client-web/storage#createFile
+    // Upload file
     let file;
     if (identificationDocument) {
       const inputFile =
@@ -73,23 +71,47 @@ export const registerPatient = async ({
       file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
     }
 
-    // Create new patient document -> https://appwrite.io/docs/references/cloud/server-nodejs/databases#createDocument
+    // Debug: Log the patient object
+    console.log("Patient data:", patient);
+
+    // Create new patient document
     const newPatient = await databases.createDocument(
       DATABASE_ID!,
       PATIENT_COLLECTION_ID!,
       ID.unique(),
       {
+        userid: patient.userId || (await getUserIdFromContext()),
         identificationDocumentId: file?.$id ? file.$id : null,
         identificationDocumentUrl: file?.$id
-          ? `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view??project=${PROJECT_ID}`
+          ? `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`
           : null,
-        ...patient,
+        disclosureConsent: patient.privacyConsent || true,
+        name: patient.name,
+        email: patient.email,
+        phone: patient.phone,
+        birthDate: patient.birthDate,
+        gender: patient.gender.toLowerCase(), // Convert to lowercase to match schema
+        address: patient.address,
+        occupation: patient.occupation,
+        emergencyContactName: patient.emergencyContactName,
+        emergencyContactNumber: patient.emergencyContactNumber,
+        primaryPhysician: patient.primaryPhysician,
+        insuranceProvider: patient.insuranceProvider,
+        insurancePolicyNumber: patient.insurancePolicyNumber,
+        allergies: patient.allergies,
+        currentMedication: patient.currentMedication,
+        familyMedicalHistory: patient.familyMedicalHistory,
+        pastMedicalHistory: patient.pastMedicalHistory,
+        identificationType: patient.identificationType,
+        identificationNumber: patient.identificationNumber,
+        privacyConsent: patient.privacyConsent,
       }
     );
 
     return parseStringify(newPatient);
   } catch (error) {
     console.error("An error occurred while creating a new patient:", error);
+    throw error;
   }
 };
 
@@ -99,7 +121,7 @@ export const getPatient = async (userId: string) => {
     const patients = await databases.listDocuments(
       DATABASE_ID!,
       PATIENT_COLLECTION_ID!,
-      [Query.equal("userId", [userId])]
+      [Query.equal("userid", [userId])]
     );
 
     return parseStringify(patients.documents[0]);
@@ -110,3 +132,16 @@ export const getPatient = async (userId: string) => {
     );
   }
 };
+
+// Helper to get authenticated user ID
+async function getUserIdFromContext() {
+  try {
+    const client = new Client().setEndpoint(ENDPOINT!).setProject(PROJECT_ID!);
+    const account = new Account(client);
+    const user = await account.get();
+    return user.$id;
+  } catch (error) {
+    console.error("Error fetching user ID:", error);
+    throw new Error("Unable to fetch authenticated user ID");
+  }
+}

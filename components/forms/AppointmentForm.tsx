@@ -37,6 +37,7 @@ export const AppointmentForm = ({
 }) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const AppointmentFormValidation = getAppointmentSchema(type);
 
@@ -57,6 +58,7 @@ export const AppointmentForm = ({
     values: z.infer<typeof AppointmentFormValidation>
   ) => {
     setIsLoading(true);
+    setError(null);
 
     let status;
     switch (type) {
@@ -72,8 +74,8 @@ export const AppointmentForm = ({
 
     try {
       if (type === "create" && patientId) {
-        const appointment = {
-          userId,
+        const appointmentData = {
+          userid: userId, // Map to "userid" to match schema
           patient: patientId,
           primaryPhysician: values.primaryPhysician,
           schedule: new Date(values.schedule),
@@ -82,7 +84,7 @@ export const AppointmentForm = ({
           note: values.note,
         };
 
-        const newAppointment = await createAppointment(appointment);
+        const newAppointment = await createAppointment(appointmentData);
 
         if (newAppointment) {
           form.reset();
@@ -112,6 +114,7 @@ export const AppointmentForm = ({
       }
     } catch (error) {
       console.log(error);
+      setError("Failed to submit appointment. Please try again.");
     }
     setIsLoading(false);
   };
